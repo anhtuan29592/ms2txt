@@ -40,9 +40,15 @@ class DataFileInfo(object):
         Read columns names from the DOP file
         """
         filename = 'F%d.DOP' % self.file_num
-        file_handle = open(filename, 'r')
+        try:
+          file_handle = open(filename, 'r')
+        except IOError:
+          filename = 'F%d.dop' % self.file_num
+          file_handle = open(filename, 'r')
         lines = file_handle.read().split()
         file_handle.close()
+        while len(lines) > self.num_fields:
+          lines.pop()
         assert(len(lines) == self.num_fields)
         self.columns = []
         for line in lines:
@@ -151,7 +157,7 @@ class DataFileInfo(object):
             #print "Expecting %d candles in file %s. num_fields : %d" % \
             #    (self.last_rec - 1, filename, self.num_fields)
 
-            outfile = open('%s.TXT' % self.stock_symbol, 'w')
+            outfile = open('%s.CSV' % self.stock_symbol, 'w')
             # write the header line, for example:
             #"Name","Date","Time","Open","High","Low","Close","Volume","Oi"
             outfile.write('"Name"')
@@ -165,7 +171,7 @@ class DataFileInfo(object):
 
             # we have (self.last_rec - 1) candles to read
             for _ in xrange(self.last_rec - 1):
-                outfile.write(self.stock_symbol)
+                outfile.write('"%s"' % self.stock_name)
                 for col in columns:
                     if col is None: # unknown column?
                         # ignore this column
