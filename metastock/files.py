@@ -6,7 +6,7 @@ import struct
 import re
 import math
 import traceback
-
+import os.path
 from .utils import fmsbin2ieee, float2date, float2time
 
 class DataFileInfo(object):
@@ -26,6 +26,8 @@ class DataFileInfo(object):
     """
     file_num = None
     num_fields = None
+    bit_fields = None
+    bits = None
     stock_symbol = None
     stock_name = None
     time_frame = None
@@ -47,6 +49,16 @@ class DataFileInfo(object):
           file_handle = open(filename, 'r')
         lines = file_handle.read().split()
         file_handle.close()
+        num_fields = 0
+        self.bits = []
+        if self.bit_fields:
+          for bit_position in range(8):
+            if ((1 << bit_position) & self.bit_fields) > 0:
+              self.bits.append(1)
+              num_fields = num_fields + 1
+            else:
+              self.bits.append(0)
+          self.num_fields = num_fields
         while len(lines) > self.num_fields:
           lines.pop()
         assert(len(lines) == self.num_fields)
@@ -147,6 +159,8 @@ class DataFileInfo(object):
         outfile = None
         try:
             filename = 'F%d.DAT' % self.file_num
+            if not os.path.exists(filename):
+              filename = 'F%d.MWD' % self.file_num # XMASTER
             file_handle = open(filename, 'rb')
             self.max_recs = struct.unpack("H", file_handle.read(2))[0]
             self.last_rec = struct.unpack("H", file_handle.read(2))[0]
@@ -164,7 +178,9 @@ class DataFileInfo(object):
             columns = []
             for ms_col_name in self.columns:
                 column = self.knownMSColumns.get(ms_col_name)
-                if column is not None:
+                if self.bits[self.columns.index(ms_col_name)] == 0:
+                    1
+                elif column is not None:
                     outfile.write(',"%s"' % column.name)
                 columns.append(column) # we append None if the column is unknown
             outfile.write('\n')
@@ -226,10 +242,13 @@ class MSEMasterFile(object):
         dfi.file_num = struct.unpack("B", file_handle.read(1))[0]
         file_handle.read(3)
         dfi.num_fields = struct.unpack("B", file_handle.read(1))[0]
-        file_handle.read(4)
+        dfi.bit_fields = struct.unpack("B", file_handle.read(1))[0]
+        file_handle.read(3)
         dfi.stock_symbol = file_handle.read(14).strip('\x00')
         file_handle.read(7)
         dfi.stock_name = file_handle.read(16).strip('\x00')
+        if dfi.stock_name.find('\x00') > 0:
+          dfi.stock_name = dfi.stock_name[0:dfi.stock_name.find('\x00')]
         file_handle.read(12)
         dfi.time_frame = struct.unpack("c", file_handle.read(1))[0]
         file_handle.read(3)
@@ -265,7 +284,79 @@ class MSEMasterFile(object):
         Lists all the symbols from metastock index file and writes it
         to the output
         """
-        print "List of available symbols:"
+        for stock in self.stocks:
+            print "symbol: %s, name: %s, file number: %s" % \
+                (stock.stock_symbol, stock.stock_name, stock.file_num)
+
+    def output_ascii(self, all_symbols, symbols):
+        """
+        Read all or specified symbols and write them to text
+        files (each symbol in separate file)
+        @param all_symbols: when True, all symbols are processed
+        @type all_symbols: C{bool}
+        @param symbols: list of symbols to process
+        """
+        for stock in self.stocks:
+            if all_symbols or (stock.stock_symbol in symbols):
+                stock.convert2ascii()
+
+class MSXMasterFile(object):
+    """
+    XMASTER format via http://meta-all.sourceforge.net/MS%20File%20Format.html
+    @ivar stocks: list of DataFileInfo objects
+    """
+    stocks = None
+
+    def _read_file_info(self, file_handle):
+        """
+        read the entry for a single symbol and return a DataFileInfo
+        describing it
+        @parm file_handle: emaster file handle
+        @return: DataFileInfo instance
+        """
+        dfi = DataFileInfo()
+        file_handle.read(1)
+        dfi.stock_symbol = file_handle.read(15)
+        if dfi.stock_symbol.find('\x00') > 0:
+          dfi.stock_symbol = dfi.stock_symbol[0:dfi.stock_symbol.find('\x00')]
+        dfi.stock_name = file_handle.read(46)
+        if dfi.stock_name.find('\x00') > 0:
+          dfi.stock_name = dfi.stock_name[0:dfi.stock_name.find('\x00')]
+        dfi.time_frame = struct.unpack("c", file_handle.read(1))[0]
+        file_handle.read(2)
+        dfi.file_num = struct.unpack("h", file_handle.read(2))[0]
+        file_handle.read(3)
+        dfi.bit_fields = struct.unpack("b", file_handle.read(1))[0]
+        file_handle.read(9)
+        dfi.last_date = struct.unpack("i", file_handle.read(4))[0]
+        file_handle.read(20)
+        dfi.first_date = struct.unpack("i", file_handle.read(4))[0]
+        file_handle.read(4+4+4+30)
+        return dfi
+
+    def __init__(self, filename, precision=None):
+        """
+        The whole file is read while creating this object
+        @param filename: name of the file to open (usually 'EMASTER')
+        @param precision: round floats to n digits after the decimal point
+        """
+        if precision is not None:
+            DataFileInfo.FloatColumn.precision = precision
+        file_handle = open(filename, 'rb')
+        file_handle.read(1+1+2+6)
+        files_no = struct.unpack("h", file_handle.read(2))[0]
+        file_handle.read(2+2+2+2+130)
+        self.stocks = []
+        while files_no > 0:
+            self.stocks.append(self._read_file_info(file_handle))
+            files_no -= 1
+        file_handle.close()
+
+    def list_all_symbols(self):
+        """
+        Lists all the symbols from metastock index file and writes it
+        to the output
+        """
         for stock in self.stocks:
             print "symbol: %s, name: %s, file number: %s" % \
                 (stock.stock_symbol, stock.stock_name, stock.file_num)

@@ -8,6 +8,7 @@ import sys
 from optparse import OptionParser
 
 from metastock.files import MSEMasterFile
+from metastock.files import MSXMasterFile
 
 Usage = """usage: %prog [options] [symbol1] [symbol2] ....
 
@@ -38,11 +39,15 @@ def main():
         sys.exit(0)
 
     em_file = MSEMasterFile('EMASTER', options.precision)
+    xm_file = MSXMasterFile('XMASTER', options.precision)
     # list the symbols or extract the data
     if options.list:
+        print "List of available symbols:"
         em_file.list_all_symbols()
+        xm_file.list_all_symbols()
     else:
         em_file.output_ascii(options.all, args)
+        xm_file.output_ascii(options.all, args)
 
 if __name__ == "__main__":
     main()
