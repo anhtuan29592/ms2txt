@@ -181,7 +181,7 @@ class DataFileInfo(object):
                 if self.bits[self.columns.index(ms_col_name)] == 0:
                     1
                 elif column is not None:
-                    outfile.write(',"%s"' % column.name)
+                    outfile.write(',"%s"' % column.name.replace('"', '""'))
                 columns.append(column) # we append None if the column is unknown
             outfile.write('\n')
 
