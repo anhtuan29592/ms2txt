@@ -5,6 +5,7 @@ in text format.
 """
 
 import sys
+import os.path
 from optparse import OptionParser
 
 from metastock.files import MSEMasterFile
@@ -38,16 +39,18 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    em_file = MSEMasterFile('EMASTER', options.precision)
-    xm_file = MSXMasterFile('XMASTER', options.precision)
     # list the symbols or extract the data
     if options.list:
         print "List of available symbols:"
-        em_file.list_all_symbols()
-        xm_file.list_all_symbols()
+        if os.path.exists('EMASTER'):
+            MSEMasterFile('EMASTER', options.precision).list_all_symbols()
+        if os.path.exists('XMASTER'):
+            MSXMasterFile('XMASTER', options.precision).list_all_symbols()
     else:
-        em_file.output_ascii(options.all, args)
-        xm_file.output_ascii(options.all, args)
+        if os.path.exists('EMASTER'):
+            MSEMasterFile('EMASTER', options.precision).output_ascii(options.all, args)
+        if os.path.exists('XMASTER'):
+            MSXMasterFile('XMASTER', options.precision).output_ascii(options.all, args)
 
 if __name__ == "__main__":
     main()
