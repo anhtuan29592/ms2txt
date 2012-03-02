@@ -100,7 +100,7 @@ class DataFileInfo(object):
 
         def format(self, value):
             if value is not None:
-                return value.strftime('%Y%m%d')
+                return "%02d%02d%02d" % (value.year, value.month, value.day)
             return DataFileInfo.Column.format(self, value)
 
     class TimeColumn(Column):
@@ -111,7 +111,7 @@ class DataFileInfo(object):
 
         def format(self, value):
             if value is not None:
-                return value.strftime('%Y%m%d')
+                return "%02d%02d%02d" % (value.year, value.month, value.day)
             return DataFileInfo.Column.format(self, value)
 
     class FloatColumn(Column):
