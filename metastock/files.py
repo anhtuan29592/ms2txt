@@ -6,6 +6,7 @@ import struct
 import re
 import math
 import traceback
+import os
 import os.path
 from .utils import fmsbin2ieee, float2date, float2time
 
@@ -171,7 +172,10 @@ class DataFileInfo(object):
             #print "Expecting %d candles in file %s. num_fields : %d" % \
             #    (self.last_rec - 1, filename, self.num_fields)
 
-            outfile = open('%s.CSV' % self.stock_symbol, 'w')
+            if os.environ.get('MS2TXT_CSV_PATH'):
+                outfile = open('%s%s.CSV' % (os.environ.get('MS2TXT_CSV_PATH'), self.stock_symbol), 'w')
+            else:
+                outfile = open('%s.CSV' % self.stock_symbol, 'w')
             # write the header line, for example:
             #"Name","Date","Time","Open","High","Low","Close","Volume","Oi"
             outfile.write('"Name"')
@@ -185,9 +189,14 @@ class DataFileInfo(object):
                 columns.append(column) # we append None if the column is unknown
             outfile.write('\n')
 
+            if os.environ.get('MS2TXT_YYYYMMDD'):
+                yyyymmdd = int(os.environ.get('MS2TXT_YYYYMMDD'))
+            else:
+                yyyymmdd = 0
+            perform_write = True
+
             # we have (self.last_rec - 1) candles to read
             for _ in xrange(self.last_rec - 1):
-                outfile.write('"%s"' % self.stock_name)
                 for col in columns:
                     if col is None: # unknown column?
                         # ignore this column
@@ -199,10 +208,14 @@ class DataFileInfo(object):
                         value = col.read(bytes)
                         # format it
                         value = col.format(value)
-
-                        outfile.write(',%s' % value)
-
-                outfile.write('\n')
+                        if col.__class__ == DataFileInfo.DateColumn:
+                            perform_write = (int(value) >= yyyymmdd)
+                            if perform_write:
+                                outfile.write('"%s"' % self.stock_name)
+                        if perform_write:
+                            outfile.write(',%s' % value)
+                if perform_write:
+                    outfile.write('\n')
         finally:
             if outfile is not None:
                 outfile.close()
