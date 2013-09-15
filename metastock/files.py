@@ -6,6 +6,7 @@ import struct
 import re
 import math
 import traceback
+import sys
 import os
 import os.path
 from .utils import fmsbin2ieee, float2date, float2time
@@ -271,6 +272,9 @@ class MSEMasterFile(object):
         dfi.last_date = float2date(struct.unpack("f", \
                                                   file_handle.read(4))[0])
         file_handle.read(116)
+        if dfi.first_date is None or dfi.last_date is None:
+          print >> sys.stderr, ["Bad dates", dfi.stock_symbol, dfi.stock_name]
+          return None
         return dfi
 
     def __init__(self, filename, precision=None):
@@ -288,7 +292,9 @@ class MSEMasterFile(object):
         self.stocks = []
         #print files_no, last_file
         while files_no > 0:
-            self.stocks.append(self._read_file_info(file_handle))
+            dfi = self._read_file_info(file_handle)
+            if dfi is not None:
+              self.stocks.append(dfi)
             files_no -= 1
         file_handle.close()
 

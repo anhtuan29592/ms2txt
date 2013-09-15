@@ -34,6 +34,8 @@ def float2date(date):
     year = 1900 + (date / 10000)
     month = (date % 10000) / 100
     day = date % 100
+    if month == 0:
+      return None
     return datetime.date(year, month, day)
 
 def float2time(time):
