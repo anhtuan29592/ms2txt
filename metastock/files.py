@@ -391,3 +391,76 @@ class MSXMasterFile(object):
         for stock in self.stocks:
             if all_symbols or (stock.stock_symbol in symbols):
                 stock.convert2ascii()
+
+
+class MSMasterFile(object):
+    """
+    XMASTER format via http://meta-all.sourceforge.net/MS%20File%20Format.html
+    @ivar stocks: list of DataFileInfo objects
+    """
+    stocks = None
+
+    def _read_file_info(self, file_handle):
+        """
+        read the entry for a single symbol and return a DataFileInfo
+        describing it
+        @parm file_handle: emaster file handle
+        @return: DataFileInfo instance
+        """
+        dfi = DataFileInfo()
+
+        dfi.file_num = struct.unpack("B", file_handle.read(1))[0]
+        file_handle.read(6)
+        dfi.stock_name = file_handle.read(16)
+        if dfi.stock_name.find('\x00') > 0:
+            dfi.stock_name = dfi.stock_name[0:dfi.stock_name.find('\x00')]
+        file_handle.read(2)
+        dfi.first_date = struct.unpack("i", file_handle.read(4))[0]
+        dfi.last_date = struct.unpack("i", file_handle.read(4))[0]
+        file_handle.read(3)
+        dfi.stock_symbol = file_handle.read(14)
+        if dfi.stock_symbol.find('\x00') > 0:
+          dfi.stock_symbol = dfi.stock_symbol[0:dfi.stock_symbol.find('\x00')]
+        file_handle.read(3)
+        return dfi
+
+    def __init__(self, filename, precision=None):
+        """
+        The whole file is read while creating this object
+        @param filename: name of the file to open (usually 'EMASTER')
+        @param precision: round floats to n digits after the decimal point
+        """
+        if precision is not None:
+            DataFileInfo.FloatColumn.precision = precision
+        file_handle = open(filename, 'rb')
+        files_no = struct.unpack("H", file_handle.read(2))[0]
+        file_handle.read(51)
+        self.stocks = []
+        #print files_no, last_file
+        while files_no > 0:
+            dfi = self._read_file_info(file_handle)
+            if dfi is not None:
+              self.stocks.append(dfi)
+            files_no -= 1
+        file_handle.close()
+
+    def list_all_symbols(self):
+        """
+        Lists all the symbols from metastock index file and writes it
+        to the output
+        """
+        for stock in self.stocks:
+            print "symbol: %s, name: %s, file number: %s" % \
+                (stock.stock_symbol, stock.stock_name, stock.file_num)
+
+    def output_ascii(self, all_symbols, symbols):
+        """
+        Read all or specified symbols and write them to text
+        files (each symbol in separate file)
+        @param all_symbols: when True, all symbols are processed
+        @type all_symbols: C{bool}
+        @param symbols: list of symbols to process
+        """
+        for stock in self.stocks:
+            if all_symbols or (stock.stock_symbol in symbols):
+                stock.convert2ascii()
